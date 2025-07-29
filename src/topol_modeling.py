@@ -1,4 +1,5 @@
 import warnings
+from tqdm import tqdm
 from typing import Literal
 import polars as pl
 import numpy as np
@@ -91,48 +92,37 @@ class TopolModeling:
         self._apply_umap()
         self._apply_leiden()
 
-    def statistical_test(self, n_simulations: int = 1000) -> float:
-        pass
+    def _build_cluster_info(self, df: pl.DataFrame, prefix: Literal["", "reduced_"] = "") -> pl.DataFrame:
+        """
+        Build cluster information DataFrame from the given DataFrame.
+        """
+        cluster_info = (
+            df.group_by("cluster")
+            .map_groups(lambda group: pl.DataFrame({
+                "cluster": group["cluster"][0],
+                "size": group.height,
+                "avg_prob": [np.mean(group["cluster_prob"].to_list())],
+                "centroid": [np.mean(group["embedding"].to_list(), axis=0)],
+                "reduced_centroid": [np.mean(group["reduced_embedding"].to_list(), axis=0)],
+                "2D_centroid": [np.mean(group["2D_embedding"].to_list(), axis=0)],
+            }))
+        )
+        cluster_info = cluster_info.with_columns([
+            pl.struct(["cluster", prefix+"centroid"]).map_elements(lambda row: dispersion(row[prefix+"centroid"], df.filter(pl.col("cluster") == row["cluster"])[prefix+"embedding"].to_list(), cosine_distance), return_dtype=pl.Float64).alias("cosine_dispersion"),
+            pl.struct(["cluster", prefix+"centroid"]).map_elements(lambda row: dispersion(row[prefix+"centroid"], df.filter(pl.col("cluster") == row["cluster"])[prefix+"embedding"].to_list(), l2_distance), return_dtype=pl.Float64).alias("l2_dispersion"),
+            pl.struct(["cluster", prefix+"centroid"]).map_elements(lambda row: dispersion(row[prefix+"centroid"], df.filter(pl.col("cluster") == row["cluster"])[prefix+"embedding"].to_list(), dot_product), return_dtype=pl.Float64).alias("dot_product_dispersion"),
+        ])
+
+        return cluster_info.sort("cluster")
 
     def get_cluster_info(self, label_col: Literal["label", "random_label"] = "label"):
-        prefix = "" # "" or "reduced_"
-        contextual_boundary_0 = self.df.filter(pl.col(label_col) == 0)
-        cluster_info_0 = (
-            contextual_boundary_0.group_by("cluster")
-            .map_groups(lambda group: pl.DataFrame({
-                "cluster": group["cluster"][0],
-                "size": group.height,
-                "avg_prob": [np.mean(group["cluster_prob"].to_list())],
-                "centroid": [np.mean(group["embedding"].to_list(), axis=0)],
-                "reduced_centroid": [np.mean(group["reduced_embedding"].to_list(), axis=0)],
-                "2D_centroid": [np.mean(group["2D_embedding"].to_list(), axis=0)],
-            }))
-        )
-        cluster_info_0 = cluster_info_0.with_columns([
-            pl.struct(["cluster", prefix+"centroid"]).map_elements(lambda row: dispersion(row[prefix+"centroid"], contextual_boundary_0.filter(pl.col("cluster") == row["cluster"])[prefix+"embedding"].to_list(), cosine_distance), return_dtype=pl.Float64).alias("cosine_dispersion"),
-            pl.struct(["cluster", prefix+"centroid"]).map_elements(lambda row: dispersion(row[prefix+"centroid"], contextual_boundary_0.filter(pl.col("cluster") == row["cluster"])[prefix+"embedding"].to_list(), l2_distance), return_dtype=pl.Float64).alias("l2_dispersion"),
-            pl.struct(["cluster", prefix+"centroid"]).map_elements(lambda row: dispersion(row[prefix+"centroid"], contextual_boundary_0.filter(pl.col("cluster") == row["cluster"])[prefix+"embedding"].to_list(), dot_product), return_dtype=pl.Float64).alias("dot_product_dispersion"),
-        ])
+        contextual_boundary_0 = self.df.filter(pl.col(label_col) == 0).clone()
+        cluster_info_0 = self._build_cluster_info(contextual_boundary_0)
         
-        contextual_boundary_1 = self.df.filter(pl.col(label_col) == 1)
-        cluster_info_1 = (
-            contextual_boundary_1.group_by("cluster")
-            .map_groups(lambda group: pl.DataFrame({
-                "cluster": group["cluster"][0],
-                "size": group.height,
-                "avg_prob": [np.mean(group["cluster_prob"].to_list())],
-                "centroid": [np.mean(group["embedding"].to_list(), axis=0)],
-                "reduced_centroid": [np.mean(group["reduced_embedding"].to_list(), axis=0)],
-                "2D_centroid": [np.mean(group["2D_embedding"].to_list(), axis=0)],
-            }))
-        )
-        cluster_info_1 = cluster_info_1.with_columns([
-            pl.struct(["cluster", prefix+"centroid"]).map_elements(lambda row: dispersion(row[prefix+"centroid"], contextual_boundary_1.filter(pl.col("cluster") == row["cluster"])[prefix+"embedding"].to_list(), cosine_distance), return_dtype=pl.Float64).alias("cosine_dispersion"),
-            pl.struct(["cluster", prefix+"centroid"]).map_elements(lambda row: dispersion(row[prefix+"centroid"], contextual_boundary_1.filter(pl.col("cluster") == row["cluster"])[prefix+"embedding"].to_list(), l2_distance), return_dtype=pl.Float64).alias("l2_dispersion"),
-            pl.struct(["cluster", prefix+"centroid"]).map_elements(lambda row: dispersion(row[prefix+"centroid"], contextual_boundary_1.filter(pl.col("cluster") == row["cluster"])[prefix+"embedding"].to_list(), dot_product), return_dtype=pl.Float64).alias("dot_product_dispersion"),
-        ])
+        contextual_boundary_1 = self.df.filter(pl.col(label_col) == 1).clone()
+        cluster_info_1 = self._build_cluster_info(contextual_boundary_1)
 
-        return cluster_info_0.sort("cluster"), cluster_info_1.sort("cluster")
+        return cluster_info_0, cluster_info_1
 
     def visualize(self, label_col: Literal["label", "random_label"] = "label", figsize = (10, 10)):
         fig, ax = plt.subplots(figsize=figsize, layout="constrained")
@@ -219,3 +209,54 @@ class TopolModeling:
         ax.set_frame_on(False)
         print("Drift computed successfully, ready to visualize.")
         return fig, ax
+
+    def _compute_drifts(self, cb0_cluster_info: pl.DataFrame, cb1_cluster_info: pl.DataFrame) -> dict:
+        cb0_cluster_ids = np.unique(cb0_cluster_info["cluster"].to_numpy())
+        cb1_cluster_ids = np.unique(cb1_cluster_info["cluster"].to_numpy())
+        clusters = np.union1d(cb0_cluster_ids, cb1_cluster_ids)
+        cb0_cluster_info = cb0_cluster_info.filter(pl.col("cluster").is_in(clusters))
+        cb1_cluster_info = cb1_cluster_info.filter(pl.col("cluster").is_in(clusters))
+        
+        drifts = {}
+        for cluster_id, cb0_centroid, cb1_centroid in zip(clusters, cb0_cluster_info["centroid"].to_list(), cb1_cluster_info["centroid"].to_list()):
+            drifts[cluster_id] = np.array(cb1_centroid) - np.array(cb0_centroid)
+
+        return drifts
+    
+    def _drift_analysis(self, drifts: dict):
+        drift_vectors = np.stack(list(drifts.values()))
+        avg_magnitude = np.mean(np.linalg.norm(drift_vectors, axis=1))
+        pairwise_cosine_sim = cosine_similarity(drift_vectors, drift_vectors)
+        triu_indices = np.triu_indices(pairwise_cosine_sim.shape[0], k=1)
+        pairwise_cosine_sim = pairwise_cosine_sim[triu_indices[0], triu_indices[1]]
+        avg_similarity = np.mean(pairwise_cosine_sim)
+        return avg_magnitude, avg_similarity
+
+    def statistical_test(self, n_simulations: int = 1000, cb0_cluster_info: pl.DataFrame = None, cb1_cluster_info: pl.DataFrame = None) -> float:
+        if self.df is None:
+            raise ValueError("Model must be fitted before performing statistical tests.")
+
+        df = self.df.clone()
+        if cb0_cluster_info is None or cb1_cluster_info is None:
+            cb0_cluster_info, cb1_cluster_info = self.get_cluster_info(label_col="label")
+
+        drifts_default = self._compute_drifts(cb0_cluster_info, cb1_cluster_info)
+        default_avg_magnitude, default_avg_similarity = self._drift_analysis(drifts_default)
+
+        random_avg_magnitudes = []
+        random_avg_similarities = []
+        for i in tqdm(range(n_simulations), desc="Simulations"):
+            df = df.with_columns(
+                pl.Series("random_label", df["label"].sample(fraction=1, shuffle=True).cast(pl.Float64)),
+            )
+            random_contextual_boundary_0_i = df.filter(pl.col("random_label") == 0).clone()
+            random_cluster_info_0_i = self._build_cluster_info(random_contextual_boundary_0_i)
+            random_contextual_boundary_1_i = df.filter(pl.col("random_label") == 1).clone()
+            random_cluster_info_1_i = self._build_cluster_info(random_contextual_boundary_1_i)
+            drifts_random_i = self._compute_drifts(random_cluster_info_0_i, random_cluster_info_1_i)
+            random_avg_magnitude, random_avg_similarity = self._drift_analysis(drifts_random_i)
+            random_avg_magnitudes.append(random_avg_magnitude)
+            random_avg_similarities.append(random_avg_similarity)
+
+        p_value = (1 + np.sum(np.array(random_avg_magnitudes) >= default_avg_magnitude)) / (n_simulations + 1)
+        return p_value, default_avg_similarity, np.mean(random_avg_similarities)
