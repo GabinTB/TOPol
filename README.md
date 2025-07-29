@@ -1,6 +1,12 @@
-# TOPOL: Transformer-Based Narrative Polarity Fields
+# TOPOL: Topic-Orientation Polarity
 
-TOPOL is a computational framework for detecting and explaining multidimensional semantic polarity shifts in text corpora. It models discourse evolution as vector displacements in transformer embedding space, enabling unsupervised reconstruction of polarity vector fields. The framework supports both institutionally constrained texts (e.g., central bank speeches) and high-variance sentiment corpora (e.g., Amazon product reviews).
+Semantic polarity in computational linguistics has traditionally been framed as sentiment along a unidimensional scale. We here challenge and advance this framing, as it oversimplifies the inherently multidimensional nature of language. We introduce TOPol (Topic-Orientation Polarity), a semi- unsupervised framework for reconstructing and interpreting multidimensional narrative polarity fields given human-on- the-loop (HoTL) defined contextual boundaries (CBs).
+
+---
+
+## ⚙️ Overall concepts
+
+TOPol begins by embedding documents using a general-purpose transformer-based large language model (tLLM), followed by a neighbor-tuned UMAP projection and topic-based segmentation via Leiden partitioning. Given a CB between regimes A and B, the framework computes directional vectors between corresponding topic-boundary centroids, producing a polarity field that captures fine-grained semantic displacement for each discourse regime change. TOPol polarity field reveals CB quality as this vectorial representation enables quantification of the magnitude, direction, and semantic meaning of polarity shifts, acting as a polarity change detection tool directing HoTL CB tuning. To interpret TOPol identified polarity shifts, we use the tLLM  to compare the extreme points of each polarity vector and generate contrastive labels with estimated coverage. Robustness tests confirm that only the definition of CBs, the primary HoTL-tunable parameter, significantly modulates TOPol outputs, indicating methodological stability.
 
 ---
 
@@ -51,15 +57,5 @@ Unzip and place the `data/` folder at the project root.
 - `data/` — Preprocessed data (optional download)
 - `outputs/` — Analysis outputs.
 - `.env.example` — Template for API key configuration
-
----
-
-## 📌 Notes
-
-- UMAP is fit on specific contextual boundaries (e.g., full negative reviews or pre-crisis speeches) to anchor the semantic space, wether...
-- Leiden clustering is applied to the full UMAP graph to detect mixed-regime semantic clusters
-- Drift is measured via centroid displacement per cluster
-- Interpretation combines TF-IDF and KeyBERT (MMR-based reranking)
-- Narrative dimensions...
 
 ---
