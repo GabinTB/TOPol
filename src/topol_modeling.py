@@ -144,7 +144,6 @@ class TopolModeling:
             c=data_A["cluster"].to_list(),
             cmap=a_color,
             s=20,
-            label="Dataset A - Doc. Embeddings",
             alpha=0.7
         )
 
@@ -156,7 +155,6 @@ class TopolModeling:
             c=data_B["cluster"].to_list(),
             cmap=b_color,
             s=20,
-            label="Dataset B - Doc. Embeddings",
             alpha=0.7
         )
 
@@ -202,8 +200,8 @@ class TopolModeling:
         ); cbar_B.set_label("Cluster ID (B)", fontsize=10)
 
         # --- Final styling ---
-        legend_dot_A = mlines.Line2D([], [], color='#3787c0', marker='o', linestyle='None', markersize=6, label='Period A - Doc. Embeddings')
-        legend_dot_B = mlines.Line2D([], [], color='#e32f27', marker='o', linestyle='None', markersize=6, label='Period B - Doc. Embeddings')
+        legend_dot_A = mlines.Line2D([], [], color='#3787c0', marker='o', linestyle='None', markersize=6, label='Contextual Boundary A - Doc. Embeddings')
+        legend_dot_B = mlines.Line2D([], [], color='#e32f27', marker='o', linestyle='None', markersize=6, label='Contextual Boundary B - Doc. Embeddings')
         ax.legend(handles=[legend_dot_A, legend_dot_B], loc="lower center", bbox_to_anchor=(0.5, -0.15), ncol=2)
         ax.set_xticks([]); ax.set_yticks([])
         ax.set_frame_on(False)

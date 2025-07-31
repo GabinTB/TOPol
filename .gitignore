@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 outputs/*
+data/archive/*
 data/*_texts.pickle
 data/*_embeddings.pickle
 data/*_sentiments.pickle
