@@ -56,6 +56,36 @@ Unzip and place the `data/` folder at the project root.
 - `notebooks/` — Experimental notebooks
 - `data/` — Preprocessed data (optional download)
 - `outputs/` — Analysis outputs.
+- `publications/` — Papers and posters.
 - `.env.example` — Template for API key configuration
+
+---
+
+## 📄 Publications
+
+### TOPol: Capturing and Explaining Multidimensional Semantic Polarity Fields and Vectors
+
+- **arXiv:** https://www.arxiv.org/abs/2510.25069  
+- **DOI:** https://doi.org/10.48550/arXiv.2510.25069  
+- **Authors:** Gabin Taibi, Lucia Gomez  
+- **Year:** 2025  
+
+If you use TOPol in academic work, please cite the following paper(s).
+
+---
+
+## 📚 Citation
+
+```bibtex
+@misc{taibi2025topolcapturingexplainingmultidimensional,
+  title        = {TOPol: Capturing and Explaining Multidimensional Semantic Polarity Fields and Vectors},
+  author       = {Taibi, Gabin and Gomez, Lucia},
+  year         = {2025},
+  eprint       = {2510.25069},
+  archivePrefix= {arXiv},
+  primaryClass = {cs.CL},
+  url          = {https://arxiv.org/abs/2510.25069}
+}
+```
 
 ---
