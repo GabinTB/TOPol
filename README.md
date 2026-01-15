@@ -1,4 +1,4 @@
-# TOPOL: Topic-Orientation Polarity
+# TOPol: Topic-Orientation Polarity
 
 Semantic polarity in computational linguistics has traditionally been framed as sentiment along a unidimensional scale. We here challenge and advance this framing, as it oversimplifies the inherently multidimensional nature of language. We introduce TOPol (Topic-Orientation Polarity), a semi- unsupervised framework for reconstructing and interpreting multidimensional narrative polarity fields given human-on- the-loop (HoTL) defined contextual boundaries (CBs).
 
